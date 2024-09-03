@@ -1,3 +1,4 @@
+#link para o dataset: https://www.kaggle.com/datasets/amerzishminha/forest-fire-smoke-and-non-fire-image-dataset
 # Passo 1: Configurações Iniciais
 import torch
 import torch.nn as nn
