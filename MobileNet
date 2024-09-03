@@ -1,0 +1,202 @@
+# Passo 1: Configurações Iniciais
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torchvision
+import zipfile
+import os
+import matplotlib.pyplot as plt
+import torchvision.transforms as transforms
+from PIL import Image
+from torch.utils.data import DataLoader
+from google.colab import drive
+
+# Passo 2: Montagem do Google Drive
+drive.mount('/content/drive')
+########################################################################################################
+# Caminho para o arquivo ZIP do dataset no Google Drive (substitua pelo caminho correto)
+zip_path = '/content/drive/MyDrive/dataset firesmoke/archive.zip'
+extract_path = '/content/dataset'
+
+# Passo 3: Extração do Dataset do ZIP
+with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    zip_ref.extractall(extract_path)
+
+# Verifique se a extração ocorreu corretamente
+if os.path.isdir(extract_path):
+    print(f'Dataset extraído com sucesso em {extract_path}')
+else:
+    print('Erro na extração do dataset.')
+###############################################################################
+dataset_images = '/content/dataset/FOREST_FIRE_SMOKE_AND_NON_FIRE_DATASET'
+#################################################################################
+# Passo 4: Carregamento do Dataset com Conversão para Escala de Cinza
+transform = transforms.Compose([
+    transforms.Grayscale(num_output_channels=1),  # Converte a imagem para preto e branco (escala de cinza)
+    transforms.Resize((224, 224)),  # Redimensiona as imagens para 224x224
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,)),  # Normalização para uma única canal
+])
+
+train_dataset = torchvision.datasets.ImageFolder(root=dataset_images + '/train', transform=transform)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=2)
+
+test_dataset = torchvision.datasets.ImageFolder(root=dataset_images + '/test', transform=transform)
+test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False, num_workers=2)
+########################################################################################################
+# Passo 5: Exibição de 5 Imagens Convertidas para Preto e Branco
+def imshow(img):
+    img = img / 2 + 0.5  # Desnormalizar
+    npimg = img.numpy()
+    plt.imshow(npimg[0], cmap='gray')
+    plt.show()
+
+# Obter 5 imagens do DataLoader
+dataiter = iter(train_loader)
+images, labels = next(dataiter)
+
+# Exibir as 5 primeiras imagens
+for i in range(5):
+    imshow(images[i])
+###########################################################################################################
+# Passo 5: Definição do Modelo
+model = torchvision.models.mobilenet_v3_large(pretrained=True)
+
+# Ajuste para aceitar uma única canal (cinza) na entrada
+model.features[0][0] = nn.Conv2d(1, model.features[0][0].out_channels, kernel_size=3, stride=2, padding=1, bias=False)
+
+model.classifier[3] = nn.Linear(model.classifier[3].in_features, len(train_dataset.classes))  # Ajusta para o número de classes do seu dataset
+
+# Movendo o modelo para a GPU se disponível
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+##########################################################################################################################################
+# Passo 6: Configuração do Treinamento
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+
+# Variável para acompanhar a melhor acurácia
+best_accuracy = 0.0
+
+# Passo 7: Treinamento e Validação
+num_epochs = 10  # Alterado para 50 épocas
+
+for epoch in range(num_epochs):
+    model.train()
+    running_loss = 0.0
+    correct = 0
+    total = 0
+
+    for i, (inputs, labels) in enumerate(train_loader, 0):
+        inputs, labels = inputs.to(device), labels.to(device)
+
+        optimizer.zero_grad()
+
+        outputs = model(inputs)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+
+        running_loss += loss.item()
+
+        # Cálculo da acurácia
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+
+        if i % 100 == 99:
+            accuracy = 100 * correct / total
+            print(f'Epoch [{epoch + 1}/{num_epochs}], Step [{i + 1}/{len(train_loader)}], Loss: {running_loss / 100:.4f}, Accuracy: {accuracy:.2f}%')
+            running_loss = 0.0
+
+    scheduler.step()
+
+    # Validação após cada época
+    model.eval()
+    correct = 0
+    total = 0
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs.data, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    validation_accuracy = 100 * correct / total
+    print(f'Validation Accuracy after epoch {epoch + 1}: {validation_accuracy:.2f}%')
+
+    # Salvar o modelo se a acurácia de validação melhorar
+    if validation_accuracy > best_accuracy:
+        best_accuracy = validation_accuracy
+        torch.save(model.state_dict(), 'best_mobilenetv3_model.pth')
+        print(f'Model saved with validation accuracy: {best_accuracy:.2f}%')
+######################################################################################################################################
+#8 passo: identificaçao
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+import torchvision.models as models
+import torch.nn as nn
+import time
+import matplotlib.pyplot as plt
+
+# Carregar o modelo MobileNetV3 pré-treinado
+loaded_model = models.mobilenet_v3_large(pretrained=False)
+
+# Ajustar a primeira camada para aceitar uma única canal (cinza)
+loaded_model.features[0][0] = nn.Conv2d(1, loaded_model.features[0][0].out_channels, kernel_size=3, stride=2, padding=1, bias=False)
+
+# Definir a nova camada final para 3 classes
+num_classes = 3
+loaded_model.classifier[3] = nn.Linear(loaded_model.classifier[3].in_features, num_classes)
+
+# Carregar os pesos do modelo salvo, ignorando a última camada
+model_state = torch.load('best_mobilenetv3_model.pth')
+del model_state['classifier.3.weight']
+del model_state['classifier.3.bias']
+loaded_model.load_state_dict(model_state, strict=False)
+
+# Mover o modelo para o dispositivo adequado (GPU se disponível)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+loaded_model = loaded_model.to(device)
+loaded_model.eval()
+
+# Definir as transformações para a imagem
+transform = transforms.Compose([
+    transforms.Grayscale(num_output_channels=1),  # Converte a imagem para preto e branco (escala de cinza)
+    transforms.Resize((224, 224)),  # Redimensiona as imagens para 224x224
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,)),  # Normalização
+])
+
+# Carregar uma imagem para inferência
+image_path = '/content/Imagem de calor falsa - 01.jpg'  # Substitua pelo caminho correto da imagem
+image = Image.open(image_path).convert('L')  # Converte a imagem para escala de cinza
+
+# Exibir a imagem
+plt.imshow(image, cmap='gray')
+plt.title('Imagem para Inferência')
+plt.show()
+
+# Transformar a imagem para a inferência
+image = transform(image).unsqueeze(0).to(device)
+
+# Medir o tempo de inferência
+start_time = time.time()
+
+# Realizar a inferência
+with torch.no_grad():
+    output = loaded_model(image)
+    _, predicted = torch.max(output.data, 1)
+
+end_time = time.time()
+
+# Mapeamento de índices para nomes das classes (substitua pelos nomes das suas classes)
+classes = ['Fumaça', 'Fogo', 'Nao fogo']  # Substitua pelos nomes reais das suas classes
+
+# Exibir o resultado e o tempo de inferência
+predicted_class = classes[predicted.item()]
+print(f'Classe prevista: {predicted_class}')
+print(f'Tempo de inferência: {end_time - start_time:.4f} segundos')
