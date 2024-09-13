@@ -5,28 +5,24 @@ def check_camera():
     try:
         # Inicializa a câmera
         picam2 = Picamera2()
-
-        # Configuração de captura de vídeo com resolução padrão
-        config = picam2.create_video_configuration(main={"size": (1280, 720)})
+        
+        # Configuração de captura em modo foto com resolução 2560x1920
+        config = picam2.create_still_configuration(main={"size": (2560, 1920)})
         picam2.configure(config)
-
-        # Exibe o vídeo em tempo real usando o Preview nativo
-        picam2.start_preview(Preview.QTGL)
-
-        # Inicia a captura do vídeo
+        
+        # Inicia a câmera
         picam2.start()
-
-        print("Capturando vídeo em tempo real. Pressione Ctrl+C para parar.")
-
-        # Manter a captura ativa
-        while True:
-            sleep(1)
-
-    except KeyboardInterrupt:
-        # Para a câmera quando o programa é interrompido
-        print("Parando a captura de vídeo.")
-        picam2.stop_preview()
+        sleep(2)  # Aguarda 2 segundos para a câmera estabilizar
+        
+        # Captura a imagem e salva no caminho especificado
+        picam2.capture_file('/home/lprad/EcoFlight/image.jpg')
+        
+        # Para a câmera após a captura
         picam2.stop()
+        
+        print("Câmera detectada e imagem capturada com sucesso.")
+        print("A imagem foi salva em /home/lprad/EcoFlight/image.jpg")
+        
     except Exception as e:
         print(f"Erro ao acessar a câmera: {e}")
 
