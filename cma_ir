@@ -10,8 +10,8 @@ def check_camera():
         config = picam2.create_video_configuration(main={"size": (1280, 720)})
         picam2.configure(config)
 
-        # Exibe o vídeo em tempo real usando o Preview nativo
-        picam2.start_preview(Preview.QTGL)
+        # Exibe o vídeo em tempo real usando o Preview via DRM (sem interface gráfica)
+        picam2.start_preview(Preview.DRM)
 
         # Inicia a captura do vídeo (somente para exibição)
         picam2.start()
@@ -20,7 +20,7 @@ def check_camera():
 
         # Mantém o vídeo em exibição até a interrupção com Ctrl+C
         while True:
-            sleep(1)  # Mantém o loop ativo enquanto o vídeo é exibido
+            sleep(1)
 
     except KeyboardInterrupt:
         # Para a câmera quando o programa é interrompido
