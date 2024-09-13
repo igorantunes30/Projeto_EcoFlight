@@ -5,23 +5,23 @@ def check_camera():
     try:
         # Inicializa a câmera
         picam2 = Picamera2()
-
-        # Configura a resolução da imagem
+        
+        # Configuração de captura em modo foto com resolução 2560x1920
         config = picam2.create_still_configuration(main={"size": (2560, 1920)})
         picam2.configure(config)
         
         # Inicia a câmera
         picam2.start()
-        sleep(2)  # Tempo para a câmera inicializar e ajustar
+        sleep(2)  # Aguarda 2 segundos para a câmera estabilizar
         
-        # Capturar a imagem
-        picam2.capture_file('/home/lprad/Imagens/iguin.jpg')
+        # Captura a imagem e salva no caminho especificado
+        picam2.capture_file('/home/pi/test_image.jpg')
         
-        # Para a câmera
+        # Para a câmera após a captura
         picam2.stop()
         
         print("Câmera detectada e imagem capturada com sucesso.")
-        print("A imagem foi salva em /home/lprad/Imagens/iguin.jpg")
+        print("A imagem foi salva em /home/pi/test_image.jpg")
         
     except Exception as e:
         print(f"Erro ao acessar a câmera: {e}")
