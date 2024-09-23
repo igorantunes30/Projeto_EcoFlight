@@ -37,4 +37,4 @@ def send_image():
 # Loop principal
 while True:
     send_image()
-    time.sleep(5)  # Captura e envia uma imagem a cada 5 segundos
+    time.sleep(1)  # Captura e envia uma imagem a cada 1 segundo
