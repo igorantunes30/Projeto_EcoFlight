@@ -1,0 +1,40 @@
+import socket
+import time
+import io
+from picamera import PiCamera
+
+# Configuração da câmera
+camera = PiCamera()
+camera.resolution = (640, 480)
+
+# IP e porta do ESP32
+ESP32_IP = '192.168.4.1'  # IP do ESP32 no modo Access Point
+ESP32_PORT = 80
+
+# Função para capturar e enviar a imagem
+def send_image():
+    # Cria um buffer para a imagem
+    image_stream = io.BytesIO()
+
+    # Captura a imagem sem salvá-la no disco
+    camera.capture(image_stream, 'jpeg')
+    image_stream.seek(0)  # Volta ao início do stream
+
+    # Conectando ao ESP32
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((ESP32_IP, ESP32_PORT))
+
+    # Enviando a imagem em pacotes
+    while True:
+        chunk = image_stream.read(1024)  # Lê 1024 bytes por vez
+        if not chunk:
+            break
+        client_socket.send(chunk)
+
+    # Finaliza a transmissão
+    client_socket.close()
+
+# Loop principal
+while True:
+    send_image()
+    time.sleep(5)  # Captura e envia uma imagem a cada 5 segundos
