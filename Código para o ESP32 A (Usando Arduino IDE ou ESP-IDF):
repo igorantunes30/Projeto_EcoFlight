@@ -2,7 +2,7 @@
 #include <WiFiClient.h>
 #include <WiFiServer.h>
 
-const char* ssid = "esp32_A";  // Nome da rede Wi-Fi (SSID)
+const char* ssid = "ESP32_AP";  // Nome da rede Wi-Fi (SSID)
 const char* password = "12345678";  // Senha da rede Wi-Fi
 
 WiFiServer server(80);  // Inicia o servidor na porta 80 (HTTP)
@@ -32,18 +32,15 @@ void loop() {
       // Lê os dados da imagem em pacotes de 1024 bytes
       int bytesRead = client.read(buffer, sizeof(buffer));
       if (bytesRead > 0) {
-        // Aqui você pode processar a imagem
+        // Aqui você pode processar a imagem ou enviar ao notebook
         Serial.print("Recebido: ");
         Serial.print(bytesRead);
         Serial.println(" bytes");
         
-        // Exemplo: você pode salvar ou exibir os dados de alguma forma
-        // Por enquanto, apenas exibe os dados no monitor serial
+        // Transmitir a imagem recebida para o notebook via Wi-Fi
         for (int i = 0; i < bytesRead; i++) {
-          Serial.print(buffer[i], HEX);
-          Serial.print(" ");
+          Serial.write(buffer[i]);
         }
-        Serial.println();
       }
     }
     client.stop();
