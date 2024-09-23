@@ -1,0 +1,13 @@
+import serial
+import time
+
+# Configurando a UART (verifique a porta correta)
+ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+
+# Enviando comando para ESP32
+while True:
+    ser.write(b'Capture e envie a imagem')
+    time.sleep(2)  # A cada 2 segundos envia o comando
+    resposta = ser.readline()
+    if resposta:
+        print("Resposta do ESP32:", resposta.decode())
