@@ -1,5 +1,4 @@
 import socket
-import time
 
 # Caminho da imagem armazenada no Raspberry Pi
 IMAGE_PATH = '/home/lprad/EcoFlight/oip_comp.jpg'
@@ -15,18 +14,17 @@ def send_image():
         # Conectando ao ESP32
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_socket.connect((ESP32_IP, ESP32_PORT))
-
-        # Enviando a imagem em pacotes
+        
+        # Envia a imagem em pacotes de 1024 bytes
         while True:
             chunk = image_file.read(1024)  # Lê 1024 bytes por vez
             if not chunk:
-                break
+                break  # Sai do loop se não houver mais dados
             client_socket.send(chunk)
 
         # Finaliza a transmissão
         client_socket.close()
+        print("Imagem enviada com sucesso!")
 
-# Loop principal
-while True:
-    send_image()
-    time.sleep(1)  # Envia a imagem armazenada a cada 1 segundo
+# Envia a imagem apenas uma vez
+send_image()
