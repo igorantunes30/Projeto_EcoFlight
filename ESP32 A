@@ -2,7 +2,7 @@ import socket
 import time
 
 # Caminho da imagem armazenada no Raspberry Pi
-IMAGE_PATH = '/home/lprad/EcoFlight/oip_comp.jpg'
+IMAGE_PATH = '/oip_comp.jpg'
 
 # IP e porta do ESP32
 ESP32_IP = '192.168.4.1'  # IP do ESP32 no modo Access Point
