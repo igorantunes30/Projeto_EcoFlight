@@ -26,24 +26,23 @@ void loop() {
   
   if (client) {
     Serial.println("Cliente conectado, recebendo imagem...");
-    uint8_t buffer[1024];
+    uint8_t buffer[1024];  // Buffer para receber dados da imagem
     
+    // Enquanto o cliente estiver conectado, recebemos os dados
     while (client.connected()) {
-      // Lê os dados da imagem em pacotes de 1024 bytes
-      int bytesRead = client.read(buffer, sizeof(buffer));
+      int bytesRead = client.read(buffer, sizeof(buffer));  // Lê os dados da imagem
       if (bytesRead > 0) {
-        // Aqui você pode processar a imagem ou enviar ao notebook
         Serial.print("Recebido: ");
         Serial.print(bytesRead);
         Serial.println(" bytes");
         
-        // Transmitir a imagem recebida para o notebook via Wi-Fi
-        for (int i = 0; i < bytesRead; i++) {
-          Serial.write(buffer[i]);
-        }
+        // Envia a imagem recebida para o Serial (ou algum outro processamento)
+        Serial.write(buffer, bytesRead);
+      } else {
+        break;  // Sai do loop se não houver mais dados
       }
     }
-    client.stop();
+    client.stop();  // Desconecta o cliente após receber a imagem
     Serial.println("Cliente desconectado");
   }
 }
