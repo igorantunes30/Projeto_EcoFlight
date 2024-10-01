@@ -1,0 +1,45 @@
+import socket
+import cv2  # Biblioteca para capturar imagem da câmera
+import io
+
+# IP e porta do notebook (servidor)
+NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook
+NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
+
+# Função para capturar e enviar a imagem da câmera
+def send_image():
+    # Inicia a captura de vídeo da câmera (indice 0 geralmente é a primeira câmera)
+    camera = cv2.VideoCapture(0)
+
+    # Verifica se a câmera foi aberta corretamente
+    if not camera.isOpened():
+        print("Não foi possível acessar a câmera.")
+        return
+
+    # Captura uma única imagem da câmera
+    ret, frame = camera.read()
+
+    # Se a captura foi bem-sucedida
+    if ret:
+        # Codifica a imagem em formato JPEG para envio
+        _, image_encoded = cv2.imencode('.jpg', frame)
+
+        # Conectando ao notebook
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
+
+        # Envia a imagem como bytes
+        image_bytes = image_encoded.tobytes()
+        client_socket.sendall(image_bytes)
+
+        # Finaliza a transmissão
+        client_socket.close()
+        print("Imagem enviada com sucesso!")
+    else:
+        print("Falha ao capturar a imagem.")
+
+    # Libera a câmera
+    camera.release()
+
+# Envia a imagem apenas uma vez
+send_image()
