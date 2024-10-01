@@ -1,6 +1,7 @@
 import socket
-import cv2  # Biblioteca para capturar imagem da câmera
+from picamera2 import Picamera2
 import io
+import time
 
 # IP e porta do notebook (servidor)
 NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook
@@ -8,38 +9,31 @@ NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
 # Função para capturar e enviar a imagem da câmera
 def send_image():
-    # Inicia a captura de vídeo da câmera (indice 0 geralmente é a primeira câmera)
-    camera = cv2.VideoCapture(0)
+    # Inicializar a PiCamera2
+    picam2 = Picamera2()
+    picam2.start()
 
-    # Verifica se a câmera foi aberta corretamente
-    if not camera.isOpened():
-        print("Não foi possível acessar a câmera.")
-        return
+    # Aguardar para garantir que a câmera esteja estável
+    time.sleep(2)
 
-    # Captura uma única imagem da câmera
-    ret, frame = camera.read()
+    # Capturar a imagem em um buffer de bytes
+    stream = io.BytesIO()
+    picam2.capture_file(stream)
+    stream.seek(0)  # Retorna o ponteiro para o início do buffer
 
-    # Se a captura foi bem-sucedida
-    if ret:
-        # Codifica a imagem em formato JPEG para envio
-        _, image_encoded = cv2.imencode('.jpg', frame)
+    # Conectando ao notebook
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
 
-        # Conectando ao notebook
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
+    # Enviar a imagem como bytes
+    client_socket.sendall(stream.read())
 
-        # Envia a imagem como bytes
-        image_bytes = image_encoded.tobytes()
-        client_socket.sendall(image_bytes)
+    # Finaliza a transmissão
+    client_socket.close()
+    print("Imagem enviada com sucesso!")
 
-        # Finaliza a transmissão
-        client_socket.close()
-        print("Imagem enviada com sucesso!")
-    else:
-        print("Falha ao capturar a imagem.")
-
-    # Libera a câmera
-    camera.release()
+    # Finalizar a câmera
+    picam2.stop()
 
 # Envia a imagem apenas uma vez
 send_image()
