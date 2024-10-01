@@ -3,17 +3,17 @@ import socket
 # Caminho da imagem armazenada no Raspberry Pi
 IMAGE_PATH = '/home/ecoflight/Documentos/EcoFlight/Projeto_EcoFlight/oip_comp.jpg'
 
-# IP e porta do ESP32
-ESP32_IP = '192.168.4.1'  # IP do ESP32 no modo Access Point
-ESP32_PORT = 80
+# IP e porta do servidor de destino (o outro dispositivo na rede Wi-Fi)
+SERVER_IP = '192.168.137.165'  # Substitua pelo IP do dispositivo de destino
+SERVER_PORT = 8080  # Porta do servidor de destino
 
 # Função para ler e enviar a imagem armazenada
 def send_image():
     # Abre o arquivo da imagem armazenada
     with open(IMAGE_PATH, 'rb') as image_file:
-        # Conectando ao ESP32
+        # Conectando ao servidor na rede local
         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((ESP32_IP, ESP32_PORT))
+        client_socket.connect((SERVER_IP, SERVER_PORT))
         
         # Envia a imagem em pacotes de 1024 bytes
         while True:
