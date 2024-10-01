@@ -1,0 +1,105 @@
+import torch
+import torchvision.transforms as transforms
+from PIL import Image
+import torch.nn as nn
+import socket
+import io
+import time
+import matplotlib.pyplot as plt
+
+# Configurações do servidor no notebook
+HOST = '0.0.0.0'  # Escuta em todas as interfaces de rede
+PORT = 8080  # Porta que o servidor vai escutar
+
+# Função para receber a imagem do Raspberry Pi
+def receive_image():
+    # Criar o socket do servidor
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(1)
+    print(f'Servidor ouvindo na porta {PORT}...')
+
+    # Aguardar por um cliente (o Raspberry Pi) se conectar
+    conn, addr = server_socket.accept()
+    print(f'Cliente conectado: {addr}')
+
+    # Receber os dados da imagem
+    image_data = b""
+    while True:
+        data = conn.recv(1024)  # Recebe pacotes de 1024 bytes
+        if not data:
+            break
+        image_data += data
+
+    # Fechar a conexão após a recepção da imagem
+    conn.close()
+
+    # Carregar a imagem recebida em um buffer
+    image_stream = io.BytesIO(image_data)
+    image = Image.open(image_stream)
+    
+    # Exibir a imagem recebida
+    plt.imshow(image, cmap='gray')
+    plt.title('Imagem Recebida para Inferência')
+    plt.show()
+
+    return image
+
+# Função principal para inferência com MobileNetV3
+def main():
+    # Carregar o modelo MobileNetV3 pré-treinado
+    loaded_model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v3_large', pretrained=False)
+
+    # Ajustar a primeira camada para aceitar um único canal (cinza)
+    loaded_model.features[0][0] = nn.Conv2d(1, loaded_model.features[0][0].out_channels, kernel_size=3, stride=2, padding=1, bias=False)
+
+    # Definir a nova camada final para 3 classes
+    num_classes = 3
+    loaded_model.classifier[3] = nn.Linear(loaded_model.classifier[3].in_features, num_classes)
+
+    # Carregar os pesos do modelo salvo, ignorando a última camada
+    model_state = torch.load('Modelo_test1.pth', map_location=torch.device('cpu'))
+    del model_state['classifier.3.weight']
+    del model_state['classifier.3.bias']
+    loaded_model.load_state_dict(model_state, strict=False)
+
+    # Mover o modelo para CPU
+    device = torch.device('cpu')
+    loaded_model = loaded_model.to(device)
+    loaded_model.eval()
+
+    # Definir as transformações para a imagem
+    transform = transforms.Compose([
+        transforms.Grayscale(num_output_channels=1),  # Converte a imagem para preto e branco (escala de cinza)
+        transforms.Resize((224, 224)),  # Redimensiona as imagens para 224x224
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,)),  # Normalização
+    ])
+
+    # Receber a imagem do Raspberry Pi (somente uma vez)
+    image = receive_image()
+
+    # Transformar a imagem para a inferência
+    image = transform(image).unsqueeze(0).to(device)
+
+    # Medir o tempo de inferência
+    start_time = time.time()
+
+    # Realizar a inferência
+    with torch.no_grad():
+        output = loaded_model(image)
+        _, predicted = torch.max(output.data, 1)
+
+    end_time = time.time()
+
+    # Mapeamento de índices para nomes das classes
+    classes = ['Fumaça', 'Fogo', 'Não Fogo']
+
+    # Exibir o resultado e o tempo de inferência
+    predicted_class = classes[predicted.item()]
+    print(f'Classe prevista: {predicted_class}')
+    print(f'Tempo de inferência: {end_time - start_time:.4f} segundos')
+
+# Chamada da função principal
+if __name__ == '__main__':
+    main()
