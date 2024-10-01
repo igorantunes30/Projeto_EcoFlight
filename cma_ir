@@ -15,13 +15,13 @@ def check_camera():
         sleep(2)  # Aguarda 2 segundos para a câmera estabilizar
         
         # Captura a imagem e salva no caminho especificado
-        picam2.capture_file('/home/lprad/EcoFlight/image.jpg')
+        picam2.capture_file('/home/Documentos/EcoFlight/image.jpg')
         
         # Para a câmera após a captura
         picam2.stop()
         
         print("Câmera detectada e imagem capturada com sucesso.")
-        print("A imagem foi salva em /home/lprad/EcoFlight/image.jpg")
+        print("A imagem foi salva em /home/Documentos/EcoFlight/image.jpg")
         
     except Exception as e:
         print(f"Erro ao acessar a câmera: {e}")
