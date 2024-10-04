@@ -1,5 +1,29 @@
-camera_info = self.global_camera_info()
-if camera_info and len(camera_info) > 0:
-    camera_num = camera_info[camera_num]['Num']
-else:
-    print("No camera detected.")
+from picamera2 import Picamera2
+
+try:
+    # Inicializa a câmera
+    picam2 = Picamera2()
+    
+    # Verifica as câmeras disponíveis
+    available_cameras = picam2.global_camera_info()
+    
+    # Se houver pelo menos uma câmera disponível
+    if available_cameras and len(available_cameras) > 0:
+        print("Câmera encontrada:")
+        print(available_cameras)
+        
+        # Inicializa a câmera, se o índice 0 for válido (primeira câmera)
+        picam2.configure(picam2.create_still_configuration())
+        picam2.start()
+        
+        # Captura uma imagem
+        picam2.capture_file("imagem_teste.jpg")
+        print("Imagem capturada com sucesso.")
+        
+        picam2.stop()
+
+    else:
+        print("Nenhuma câmera foi detectada. Verifique a conexão da OV5647.")
+    
+except Exception as e:
+    print(f"Erro ao inicializar a câmera: {e}")
