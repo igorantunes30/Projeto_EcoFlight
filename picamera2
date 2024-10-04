@@ -1,17 +1,5 @@
-from picamera2 import Picamera2
-import time
-
-# Inicializa a câmera
-picam2 = Picamera2()
-
-# Configura a câmera
-picam2.start()
-
-# Aguarda 2 segundos para ajustar a exposição
-time.sleep(2)
-
-# Captura e salva uma imagem
-picam2.capture_file("test_image.jpg")
-picam2.stop()
-
-print("Imagem capturada e salva como 'test_image.jpg'")
+camera_info = self.global_camera_info()
+if camera_info and len(camera_info) > 0:
+    camera_num = camera_info[camera_num]['Num']
+else:
+    print("No camera detected.")
