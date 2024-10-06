@@ -1,27 +1,25 @@
-from picamera2 import Picamera2, Preview
+from picamera import PiCamera
 from time import sleep
 
 def check_camera():
     try:
         # Inicializa a câmera
-        picam2 = Picamera2()
+        camera = PiCamera()
         
-        # Configuração de captura em modo foto com resolução 2560x1920
-        config = picam2.create_still_configuration(main={"size": (2560, 1920)})
-        picam2.configure(config)
+        # Configura a resolução da imagem
+        camera.resolution = (2560, 1920)
         
-        # Inicia a câmera
-        picam2.start()
-        sleep(2)  # Aguarda 2 segundos para a câmera estabilizar
+        # Aguarda a estabilização da câmera
+        sleep(2)
         
         # Captura a imagem e salva no caminho especificado
-        picam2.capture_file('/home/Documents/image.jpg')
+        camera.capture('/home/EcoFlight/Documents/test.jpg')
         
-        # Para a câmera após a captura
-        picam2.stop()
+        # Finaliza a câmera após a captura
+        camera.close()
         
         print("Câmera detectada e imagem capturada com sucesso.")
-        print("A imagem foi salva em /home/Documents/image.jpg")
+        print("A imagem foi salva em /home//Documents/image.jpg")
         
     except Exception as e:
         print(f"Erro ao acessar a câmera: {e}")
