@@ -9,7 +9,7 @@ def check_camera():
         
         picam2.start()
         sleep(2)  # Tempo para a câmera inicializar
-        picam2.capture_file('/home/pi/test_image.jpg')
+        picam2.capture_file('/home/EcoFlight/test_image.jpg')
         picam2.stop()
         
         print("Câmera detectada e imagem capturada com sucesso.")
