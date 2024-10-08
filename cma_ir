@@ -1,61 +1,43 @@
-import cv2
 import socket
+import io
+from PIL import Image
+import matplotlib.pyplot as plt
 
-# Configurações do servidor (notebook)
-NOTEBOOK_IP = '192.168.0.119'  # Substitua pelo IP do notebook
-NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
+# Configurações do servidor no notebook
+HOST = '0.0.0.0'  # Escuta em todas as interfaces de rede
+PORT = 8080  # Porta que o servidor vai escutar
 
-# URL do stream de vídeo do DroidCam
-CAMERA_URL = 'http://192.168.0.134:4747/video'  # URL do vídeo do DroidCam
+def receive_image():
+    # Criar o socket do servidor
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(1)
+    print(f'Servidor ouvindo na porta {PORT}...')
 
-def wait_for_trigger_and_send_image():
-    # Configurar o servidor para receber o comando de captura de imagem
-    trigger_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    trigger_socket.bind(('0.0.0.0', 8888))  # Escuta em todas as interfaces de rede do Raspberry Pi
-    trigger_socket.listen(1)
+    # Aguardar por um cliente (o Raspberry Pi) se conectar
+    conn, addr = server_socket.accept()
+    print(f'Cliente conectado: {addr}')
 
-    print("Aguardando comando do notebook para tirar a foto...")
-
+    # Receber os dados da imagem
+    image_data = b""
     while True:
-        conn, addr = trigger_socket.accept()
-        print(f'Comando recebido de {addr}, capturando imagem...')
+        data = conn.recv(1024)
+        if not data:
+            break
+        image_data += data
 
-        # Abrir a conexão com o stream de vídeo
-        cap = cv2.VideoCapture(CAMERA_URL)
+    # Fechar a conexão após a recepção da imagem
+    conn.close()
 
-        if not cap.isOpened():
-            print("Erro ao acessar a câmera do celular.")
-            conn.close()
-            continue
+    # Carregar a imagem recebida em um buffer
+    image_stream = io.BytesIO(image_data)
+    image = Image.open(image_stream)
 
-        ret, frame = cap.read()
-        if not ret:
-            print("Falha ao capturar frame do vídeo.")
-            conn.close()
-            cap.release()
-            continue
+    # Exibir a imagem recebida
+    plt.imshow(image)
+    plt.title('Imagem Recebida')
+    plt.show()
 
-        # Salvar o frame como imagem temporária
-        image_path = 'captured_image.jpg'
-        cv2.imwrite(image_path, frame)
-        cap.release()
-
-        # Ler a imagem capturada e enviar para o notebook
-        try:
-            with open(image_path, 'rb') as image_file:
-                image_data = image_file.read()
-
-            # Conectar ao notebook e enviar a imagem
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
-            client_socket.sendall(image_data)
-            client_socket.close()
-            print("Imagem enviada com sucesso!")
-
-        except Exception as e:
-            print(f"Erro ao enviar a imagem: {e}")
-
-        conn.close()
-
+# Função principal para iniciar o servidor
 if __name__ == '__main__':
-    wait_for_trigger_and_send_image()
+    receive_image()
