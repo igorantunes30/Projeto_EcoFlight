@@ -1,32 +1,44 @@
+import socket
+import time
 from picamera2 import Picamera2
-from time import sleep
 
-def check_camera():
-    try:
-        # Inicializa a câmera
-        picam2 = Picamera2()
+# Configurações da câmera
+picam2 = Picamera2()
 
-        # Configura a resolução da imagem
-        config = picam2.create_still_configuration(main={"size": (2560, 1920)})
-        picam2.configure(config)
+# IP e porta do notebook (servidor)
+NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook
+NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
-        # Inicia a câmera
-        picam2.start()
-        
-        # Aguarda a estabilização da câmera
-        sleep(2)
+# Função para capturar e enviar a imagem armazenada
+def send_image():
+    while True:
+        # Caminho da imagem a ser capturada
+        IMAGE_PATH = 'captured_image.jpg'
 
         # Captura a imagem e salva no caminho especificado
-        picam2.capture_file('/home/EcoFlight/Documents/test.jpg')
-
-        # Finaliza a câmera após a captura
+        picam2.start()
+        picam2.capture_file(IMAGE_PATH)
         picam2.stop()
 
-        print("Câmera detectada e imagem capturada com sucesso.")
-        print("A imagem foi salva em /home/EcoFlight/Documents/test.jpg")
+        # Abre o arquivo da imagem capturada
+        with open(IMAGE_PATH, 'rb') as image_file:
+            # Conectando ao notebook
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
 
-    except Exception as e:
-        print(f"Erro ao acessar a câmera: {e}")
+            # Envia a imagem em pacotes de 1024 bytes
+            while True:
+                chunk = image_file.read(1024)  # Lê 1024 bytes por vez
+                if not chunk:
+                    break  # Sai do loop se não houver mais dados
+                client_socket.send(chunk)
 
-if __name__ == "__main__":
-    check_camera()
+            # Finaliza a transmissão
+            client_socket.close()
+            print("Imagem enviada com sucesso!")
+
+        # Aguarda 1 segundo antes de capturar e enviar a próxima imagem
+        time.sleep(1)
+
+# Envia imagens continuamente a cada 1 segundo
+send_image()
