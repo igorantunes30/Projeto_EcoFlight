@@ -1,105 +1,136 @@
 import torch
 import torchvision.transforms as transforms
-from PIL import Image
+from PIL import Image, ImageTk
+import torchvision.models as models
 import torch.nn as nn
+import time
+import tkinter as tk
+from tkinter import Label, Button, Frame
 import socket
 import io
-import time
-import matplotlib.pyplot as plt
 
 # Configurações do servidor no notebook
 HOST = '0.0.0.0'  # Escuta em todas as interfaces de rede
 PORT = 8080  # Porta que o servidor vai escutar
+RASP_IP = '192.168.137.254'  # IP do Raspberry Pi no hotspot do notebook
+RASP_PORT = 3011  # Porta para enviar o comando de captura
 
-# Função para receber a imagem do Raspberry Pi
-def receive_image():
-    # Criar o socket do servidor
+# Definir o modelo MobileNetV3
+loaded_model = models.mobilenet_v3_large(pretrained=False)
+num_classes = 2
+loaded_model.classifier[3] = nn.Linear(loaded_model.classifier[3].in_features, num_classes)
+
+# Carregar os pesos do modelo salvo
+model_state = torch.load('MobileNet/detectores/isqueiro_model.pth', map_location=torch.device('cpu'))
+loaded_model.load_state_dict(model_state, strict=False)
+loaded_model = loaded_model.to(torch.device('cpu'))
+loaded_model.eval()
+
+# Transformação de imagem para RGB (mantendo 3 canais)
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Garantindo que a imagem seja redimensionada para 224x224
+    transforms.ToTensor(),
+    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalização para imagens RGB
+])
+
+# Função para enviar comando de captura para o Raspberry Pi
+def send_capture_command():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((RASP_IP, RASP_PORT))
+            s.sendall(b'capture')
+            print("Comando de captura enviado para o Raspberry Pi")
+        receive_image_and_infer()
+    except Exception as e:
+        print(f"Erro ao enviar comando de captura: {e}")
+        label_result.config(text=f"Erro ao enviar comando de captura: {e}")
+
+# Função para receber a imagem do Raspberry Pi e realizar a inferência
+def receive_image_and_infer():
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
     server_socket.listen(1)
     print(f'Servidor ouvindo na porta {PORT}...')
 
-    # Aguardar por um cliente (o Raspberry Pi) se conectar
     conn, addr = server_socket.accept()
-    print(f'Cliente conectado: {addr}')
+    print(f'Imagem recebida de {addr}')
 
-    # Receber os dados da imagem
     image_data = b""
     while True:
-        data = conn.recv(1024)  # Recebe pacotes de 1024 bytes
+        data = conn.recv(1024)
         if not data:
             break
         image_data += data
 
-    # Fechar a conexão após a recepção da imagem
     conn.close()
 
-    # Carregar a imagem recebida em um buffer
-    image_stream = io.BytesIO(image_data)
-    image = Image.open(image_stream)
-    
-    # Exibir a imagem recebida
-    plt.imshow(image, cmap='gray')
-    plt.title('Imagem Recebida para Inferência')
-    plt.show()
+    try:
+        image_stream = io.BytesIO(image_data)
+        img = Image.open(image_stream).convert('RGB')  # Certifique-se de converter a imagem para RGB
 
-    return image
+        img_display = ImageTk.PhotoImage(img)
+        label_img.config(image=img_display)
+        label_img.image = img_display
 
-# Função principal para inferência com MobileNetV3
-def main():
-    # Carregar o modelo MobileNetV3 pré-treinado
-    loaded_model = torch.hub.load('pytorch/vision:v0.10.0', 'mobilenet_v3_large', pretrained=False)
+        image_tensor = transform(img).unsqueeze(0).to(torch.device('cpu'))
+        infer(image_tensor)
+    except Exception as e:
+        print(f"Erro ao processar a imagem: {e}")
+        label_result.config(text=f"Erro ao processar a imagem: {e}")
 
-    # Ajustar a primeira camada para aceitar um único canal (cinza)
-    loaded_model.features[0][0] = nn.Conv2d(1, loaded_model.features[0][0].out_channels, kernel_size=3, stride=2, padding=1, bias=False)
+# Função para realizar a inferência
+def infer(image_tensor):
+    try:
+        start_time = time.time()
+        with torch.no_grad():
+            output = loaded_model(image_tensor)
+            _, predicted = torch.max(output.data, 1)
+        end_time = time.time()
 
-    # Definir a nova camada final para 3 classes
-    num_classes = 3
-    loaded_model.classifier[3] = nn.Linear(loaded_model.classifier[3].in_features, num_classes)
+        classes = ['fogo', 'nao fogo']
+        predicted_class = classes[predicted.item()]
+        inference_time = end_time - start_time
 
-    # Carregar os pesos do modelo salvo, ignorando a última camada
-    model_state = torch.load('Modelo_test1.pth', map_location=torch.device('cpu'))
-    del model_state['classifier.3.weight']
-    del model_state['classifier.3.bias']
-    loaded_model.load_state_dict(model_state, strict=False)
+        label_result.config(text=f'Classe prevista: {predicted_class}\nTempo de inferência: {inference_time:.4f} segundos')
+    except Exception as e:
+        print(f"Erro durante a inferência: {e}")
+        label_result.config(text=f"Erro durante a inferência: {e}")
 
-    # Mover o modelo para CPU
-    device = torch.device('cpu')
-    loaded_model = loaded_model.to(device)
-    loaded_model.eval()
+# Função para fechar o programa
+def close_program():
+    root.destroy()
 
-    # Definir as transformações para a imagem
-    transform = transforms.Compose([
-        transforms.Grayscale(num_output_channels=1),  # Converte a imagem para preto e branco (escala de cinza)
-        transforms.Resize((224, 224)),  # Redimensiona as imagens para 224x224
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,)),  # Normalização
-    ])
+# Interface gráfica
+root = tk.Tk()
+root.title("Inferência de Imagem com MobileNetV3")
+root.geometry("600x700")
+root.configure(bg="#f0f0f0")
 
-    # Receber a imagem do Raspberry Pi (somente uma vez)
-    image = receive_image()
+frame_top = Frame(root, bg="#f0f0f0")
+frame_top.place(x=10, y=10)
 
-    # Transformar a imagem para a inferência
-    image = transform(image).unsqueeze(0).to(device)
+frame_buttons = Frame(root, bg="#f0f0f0")
+frame_buttons.place(x=10, y=60)
 
-    # Medir o tempo de inferência
-    start_time = time.time()
+frame_img = Frame(root, bg="#f0f0f0")
+frame_img.pack(pady=100)
 
-    # Realizar a inferência
-    with torch.no_grad():
-        output = loaded_model(image)
-        _, predicted = torch.max(output.data, 1)
+label_img = Label(frame_img, bg="#f0f0f0")
+label_img.pack()
 
-    end_time = time.time()
+label_ecoflight = Label(frame_top, text="EcoFlight", font=("Arial", 16, "bold"), bg="#f0f0f0")
+label_ecoflight.pack(side=tk.LEFT)
 
-    # Mapeamento de índices para nomes das classes
-    classes = ['Fumaça', 'Fogo', 'Não Fogo']
+label_model = Label(frame_top, text="Modelo: MobileNetV3", font=("Arial", 12), bg="#f0f0f0")
+label_model.pack(side=tk.LEFT, padx=20)
 
-    # Exibir o resultado e o tempo de inferência
-    predicted_class = classes[predicted.item()]
-    print(f'Classe prevista: {predicted_class}')
-    print(f'Tempo de inferência: {end_time - start_time:.4f} segundos')
+capture_button = Button(frame_buttons, text="Capturar Imagem", command=send_capture_command, bg="#007BFF", fg="white", font=("Arial", 12), padx=10, pady=5)
+capture_button.pack(side=tk.LEFT, padx=10)
 
-# Chamada da função principal
-if __name__ == '__main__':
-    main()
+close_button = Button(frame_buttons, text="Fechar", command=close_program, bg="#FF6347", fg="white", font=("Arial", 12), padx=10, pady=5)
+close_button.pack(side=tk.RIGHT, padx=10)
+
+label_result = Label(root, text="", wraplength=400, bg="#f0f0f0", font=("Arial", 14))
+label_result.pack(pady=20)
+
+root.mainloop()
