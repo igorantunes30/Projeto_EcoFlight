@@ -8,7 +8,7 @@ NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook
 NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
 # URL do stream da câmera do celular
-CAMERA_URL = 'http://192.168.137.138.4747/video'  # Substitua pelo IP da câmera IP do seu celular
+CAMERA_URL = 'http://192.168.137.138.4747/'  # Substitua pelo IP da câmera IP do seu celular
 
 def capture_and_send_image():
     while True:
