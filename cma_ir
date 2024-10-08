@@ -2,7 +2,7 @@ import cv2
 import socket
 
 # Novo IP e Porta para conexão com o Notebook usando o hotspot
-NOTEBOOK_IP = ' 192.168.0.119'  # Substitua pelo IP do notebook no hotspot
+NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook no hotspot
 NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
 # URL do stream de vídeo do DroidCam
