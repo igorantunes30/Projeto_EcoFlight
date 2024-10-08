@@ -1,6 +1,5 @@
 import cv2
 import socket
-import time
 
 # Configurações do servidor (notebook)
 NOTEBOOK_IP = '192.168.0.119'  # Substitua pelo IP do notebook
@@ -9,28 +8,37 @@ NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 # URL do stream de vídeo do DroidCam
 CAMERA_URL = 'http://192.168.0.134:4747/video'  # URL do vídeo do DroidCam
 
-def capture_and_send_image():
-    # Abrir a conexão com o stream de vídeo
-    cap = cv2.VideoCapture(CAMERA_URL)
+def wait_for_trigger_and_send_image():
+    # Configurar o servidor para receber o comando de captura de imagem
+    trigger_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    trigger_socket.bind((NOTEBOOK_IP, 8888))
+    trigger_socket.listen(1)
 
-    if not cap.isOpened():
-        print("Erro ao acessar a câmera do celular.")
-        return
+    print("Aguardando comando do notebook para tirar a foto...")
 
     while True:
-        # Ignorar todos os frames do vídeo, exceto um a cada segundo
-        for _ in range(30):  # Pular aproximadamente 1 segundo de frames (assumindo ~30 FPS)
-            cap.grab()
+        conn, addr = trigger_socket.accept()
+        print(f'Comando recebido de {addr}, capturando imagem...')
 
-        # Capturar um frame do vídeo
+        # Abrir a conexão com o stream de vídeo
+        cap = cv2.VideoCapture(CAMERA_URL)
+
+        if not cap.isOpened():
+            print("Erro ao acessar a câmera do celular.")
+            conn.close()
+            continue
+
         ret, frame = cap.read()
         if not ret:
             print("Falha ao capturar frame do vídeo.")
-            break
+            conn.close()
+            cap.release()
+            continue
 
         # Salvar o frame como imagem temporária
         image_path = 'captured_image.jpg'
         cv2.imwrite(image_path, frame)
+        cap.release()
 
         # Ler a imagem capturada e enviar para o notebook
         try:
@@ -45,12 +53,9 @@ def capture_and_send_image():
             print("Imagem enviada com sucesso!")
 
         except Exception as e:
-            print(f"Erro ao capturar ou enviar imagem: {e}")
+            print(f"Erro ao enviar a imagem: {e}")
 
-        # Aguardar 1 segundo antes de capturar o próximo frame
-        time.sleep(1)
-
-    cap.release()
+        conn.close()
 
 if __name__ == '__main__':
-    capture_and_send_image()
+    wait_for_trigger_and_send_image()
