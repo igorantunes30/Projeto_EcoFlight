@@ -1,44 +1,38 @@
 import socket
-import time
-from picamera2 import Picamera2
+import requests
+from PIL import Image
+from io import BytesIO
 
-# Configurações da câmera
-picam2 = Picamera2()
-
-# IP e porta do notebook (servidor)
+# Configurações do servidor (notebook)
 NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook
 NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
-# Função para capturar e enviar a imagem armazenada
-def send_image():
+# URL do stream da câmera do celular
+CAMERA_URL = 'http://192.168.1.100:8080/shot.jpg'  # Substitua pelo IP da câmera IP do seu celular
+
+def capture_and_send_image():
     while True:
-        # Caminho da imagem a ser capturada
-        IMAGE_PATH = 'captured_image.jpg'
+        try:
+            # Fazer a requisição HTTP para obter a imagem da câmera do celular
+            response = requests.get(CAMERA_URL)
+            image = Image.open(BytesIO(response.content))
 
-        # Captura a imagem e salva no caminho especificado
-        picam2.start()
-        picam2.capture_file(IMAGE_PATH)
-        picam2.stop()
+            # Salvar a imagem temporariamente
+            image.save('captured_image.jpg')
 
-        # Abre o arquivo da imagem capturada
-        with open(IMAGE_PATH, 'rb') as image_file:
-            # Conectando ao notebook
+            # Ler a imagem capturada
+            with open('captured_image.jpg', 'rb') as image_file:
+                image_data = image_file.read()
+
+            # Conectar ao notebook e enviar a imagem
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
-
-            # Envia a imagem em pacotes de 1024 bytes
-            while True:
-                chunk = image_file.read(1024)  # Lê 1024 bytes por vez
-                if not chunk:
-                    break  # Sai do loop se não houver mais dados
-                client_socket.send(chunk)
-
-            # Finaliza a transmissão
+            client_socket.sendall(image_data)
             client_socket.close()
             print("Imagem enviada com sucesso!")
 
-        # Aguarda 1 segundo antes de capturar e enviar a próxima imagem
-        time.sleep(1)
+        except Exception as e:
+            print(f"Erro ao capturar ou enviar imagem: {e}")
 
-# Envia imagens continuamente a cada 1 segundo
-send_image()
+if __name__ == '__main__':
+    capture_and_send_image()
