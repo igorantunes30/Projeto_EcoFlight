@@ -6,7 +6,7 @@ NOTEBOOK_IP = ' 192.168.0.119'  # Substitua pelo IP do notebook no hotspot
 NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
 # URL do stream de vídeo do DroidCam
-CAMERA_URL = 'http://192.168.137.134:4747/video'  # URL do vídeo do DroidCam
+CAMERA_URL = 'http://192.168.137.138:4747/video'  # URL do vídeo do DroidCam
 
 def wait_for_trigger_and_send_image():
     # Configurar o servidor para receber o comando de captura de imagem
