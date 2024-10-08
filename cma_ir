@@ -11,7 +11,7 @@ CAMERA_URL = 'http://192.168.0.134:4747/video'  # URL do vídeo do DroidCam
 def wait_for_trigger_and_send_image():
     # Configurar o servidor para receber o comando de captura de imagem
     trigger_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    trigger_socket.bind((NOTEBOOK_IP, 8888))
+    trigger_socket.bind(('0.0.0.0', 8888))  # Escuta em todas as interfaces de rede do Raspberry Pi
     trigger_socket.listen(1)
 
     print("Aguardando comando do notebook para tirar a foto...")
