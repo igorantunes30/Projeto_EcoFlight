@@ -9,7 +9,7 @@ NOTEBOOK_IP = '192.168.0.119'  # Substitua pelo IP do notebook
 NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
 # URL do stream da câmera do celular (DroidCam)
-CAMERA_URL = 'http://192.168.0.134:4747/video'  # URL correta para capturar a imagem da câmera IP
+CAMERA_URL = 'http://192.168.0.134:4747/shot.png'  # URL correta para capturar a imagem da câmera IP
 
 def capture_and_send_image():
     while True:
