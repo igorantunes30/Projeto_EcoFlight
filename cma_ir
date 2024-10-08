@@ -1,61 +1,12 @@
 import cv2
-import socket
 
-# Novo IP e Porta para conexão com o Notebook usando o hotspot
-NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook no hotspot
-NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
-
-# URL do stream de vídeo do DroidCam
-CAMERA_URL = 'http://192.168.137.138:4747/video'  # URL do vídeo do DroidCam
-
-def wait_for_trigger_and_send_image():
-    # Configurar o servidor para receber o comando de captura de imagem
-    trigger_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    trigger_socket.bind(('0.0.0.0', 3011))  # Escuta em todas as interfaces de rede do Raspberry Pi
-    trigger_socket.listen(1)
-
-    print("Aguardando comando do notebook para tirar a foto...")
-
-    while True:
-        conn, addr = trigger_socket.accept()
-        print(f'Comando recebido de {addr}, capturando imagem...')
-
-        # Abrir a conexão com o stream de vídeo
-        cap = cv2.VideoCapture(CAMERA_URL)
-
-        if not cap.isOpened():
-            print("Erro ao acessar a câmera do celular.")
-            conn.close()
-            continue
-
-        ret, frame = cap.read()
-        if not ret:
-            print("Falha ao capturar frame do vídeo.")
-            conn.close()
-            cap.release()
-            continue
-
-        # Salvar o frame como imagem temporária
-        image_path = 'captured_image.jpg'
-        cv2.imwrite(image_path, frame)
-        cap.release()
-
-        # Ler a imagem capturada e enviar para o notebook
-        try:
-            with open(image_path, 'rb') as image_file:
-                image_data = image_file.read()
-
-            # Conectar ao notebook e enviar a imagem
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
-            client_socket.sendall(image_data)
-            client_socket.close()
-            print("Imagem enviada com sucesso!")
-
-        except Exception as e:
-            print(f"Erro ao enviar a imagem: {e}")
-
-        conn.close()
-
-if __name__ == '__main__':
-    wait_for_trigger_and_send_image()
+cap = cv2.VideoCapture('http://192.168.1.10:8080/video')
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
+    cv2.imshow('Camera do Celular', frame)
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+cap.release()
+cv2.destroyAllWindows()
