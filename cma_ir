@@ -2,37 +2,45 @@ import socket
 import requests
 from PIL import Image
 from io import BytesIO
+import time
 
 # Configurações do servidor (notebook)
 NOTEBOOK_IP = '192.168.137.1'  # Substitua pelo IP do notebook
 NOTEBOOK_PORT = 8080  # Porta que o servidor do notebook está escutando
 
-# URL do stream da câmera do celular
-CAMERA_URL = 'http://192.168.137.138.4747/'  # Substitua pelo IP da câmera IP do seu celular
+# URL do stream da câmera do celular (DroidCam)
+CAMERA_URL = 'http://192.168.0.137:4747/video'  # URL correta para capturar a imagem da câmera IP
 
 def capture_and_send_image():
     while True:
         try:
             # Fazer a requisição HTTP para obter a imagem da câmera do celular
             response = requests.get(CAMERA_URL)
-            image = Image.open(BytesIO(response.content))
+            if response.status_code == 200:
+                image = Image.open(BytesIO(response.content))
 
-            # Salvar a imagem temporariamente
-            image.save('captured_image.jpg')
+                # Salvar a imagem temporariamente
+                image.save('captured_image.jpg')
 
-            # Ler a imagem capturada
-            with open('captured_image.jpg', 'rb') as image_file:
-                image_data = image_file.read()
+                # Ler a imagem capturada
+                with open('captured_image.jpg', 'rb') as image_file:
+                    image_data = image_file.read()
 
-            # Conectar ao notebook e enviar a imagem
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
-            client_socket.sendall(image_data)
-            client_socket.close()
-            print("Imagem enviada com sucesso!")
+                # Conectar ao notebook e enviar a imagem
+                client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
+                client_socket.sendall(image_data)
+                client_socket.close()
+                print("Imagem enviada com sucesso!")
+
+            else:
+                print(f"Erro ao capturar imagem: {response.status_code}")
 
         except Exception as e:
             print(f"Erro ao capturar ou enviar imagem: {e}")
+
+        # Aguarde 1 segundo antes de capturar a próxima imagem
+        time.sleep(1)
 
 if __name__ == '__main__':
     capture_and_send_image()
