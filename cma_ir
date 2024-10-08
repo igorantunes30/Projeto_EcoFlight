@@ -18,6 +18,10 @@ def capture_and_send_image():
         return
 
     while True:
+        # Ignorar todos os frames do vídeo, exceto um a cada segundo
+        for _ in range(30):  # Pular aproximadamente 1 segundo de frames (assumindo ~30 FPS)
+            cap.grab()
+
         # Capturar um frame do vídeo
         ret, frame = cap.read()
         if not ret:
