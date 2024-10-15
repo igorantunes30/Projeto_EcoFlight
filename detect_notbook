@@ -8,6 +8,8 @@ import tkinter as tk
 from tkinter import Label, Button, Frame
 import socket
 import io
+import os
+from datetime import datetime
 
 # Configurações do servidor no notebook
 HOST = '0.0.0.0'  # Escuta em todas as interfaces de rede
@@ -21,7 +23,7 @@ num_classes = 2
 loaded_model.classifier[3] = nn.Linear(loaded_model.classifier[3].in_features, num_classes)
 
 # Carregar os pesos do modelo salvo
-model_state = torch.load('MobileNet/detectores/isqueiro_model.pth', map_location=torch.device('cpu'))
+model_state = torch.load('isqueiro_model.pth', map_location=torch.device('cpu'))
 loaded_model.load_state_dict(model_state, strict=False)
 loaded_model = loaded_model.to(torch.device('cpu'))
 loaded_model.eval()
@@ -32,6 +34,11 @@ transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))  # Normalização para imagens RGB
 ])
+
+# Criar pasta para armazenar as imagens capturadas, se ainda não existir
+save_directory = "captured_images"
+if not os.path.exists(save_directory):
+    os.makedirs(save_directory)
 
 # Função para enviar comando de captura para o Raspberry Pi
 def send_capture_command():
@@ -68,6 +75,12 @@ def receive_image_and_infer():
         image_stream = io.BytesIO(image_data)
         img = Image.open(image_stream).convert('RGB')  # Certifique-se de converter a imagem para RGB
 
+        # Salvar a imagem na pasta 'captured_images' com um nome único
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        image_filename = os.path.join(save_directory, f"captured_image_{timestamp}.jpg")
+        img.save(image_filename)
+        print(f"Imagem salva em: {image_filename}")
+
         img_display = ImageTk.PhotoImage(img)
         label_img.config(image=img_display)
         label_img.image = img_display
@@ -96,8 +109,21 @@ def infer(image_tensor):
         print(f"Erro durante a inferência: {e}")
         label_result.config(text=f"Erro durante a inferência: {e}")
 
+# Funções para enviar comandos de captura automaticamente em intervalos
+def start_automatic_capture(interval):
+    stop_automatic_capture()  # Para qualquer captura automática em andamento
+    global auto_capture_id
+    auto_capture_id = root.after(interval, lambda: [send_capture_command(), start_automatic_capture(interval)])
+
+def stop_automatic_capture():
+    global auto_capture_id
+    if auto_capture_id:
+        root.after_cancel(auto_capture_id)
+        auto_capture_id = None
+
 # Função para fechar o programa
 def close_program():
+    stop_automatic_capture()
     root.destroy()
 
 # Interface gráfica
@@ -124,13 +150,22 @@ label_ecoflight.pack(side=tk.LEFT)
 label_model = Label(frame_top, text="Modelo: MobileNetV3", font=("Arial", 12), bg="#f0f0f0")
 label_model.pack(side=tk.LEFT, padx=20)
 
-capture_button = Button(frame_buttons, text="Capturar Imagem", command=send_capture_command, bg="#007BFF", fg="white", font=("Arial", 12), padx=10, pady=5)
-capture_button.pack(side=tk.LEFT, padx=10)
+# Botões para capturas automáticas em diferentes intervalos
+Button(frame_buttons, text="Captura a cada 0,5s", command=lambda: start_automatic_capture(500), bg="#007BFF", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+Button(frame_buttons, text="Captura a cada 1s", command=lambda: start_automatic_capture(1000), bg="#28a745", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+Button(frame_buttons, text="Captura a cada 0,25s", command=lambda: start_automatic_capture(250), bg="#FFC107", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
 
+# Botão para parar a captura automática
+Button(frame_buttons, text="Parar Captura", command=stop_automatic_capture, bg="#FF6347", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.RIGHT, padx=10)
+
+# Botão para fechar o programa
 close_button = Button(frame_buttons, text="Fechar", command=close_program, bg="#FF6347", fg="white", font=("Arial", 12), padx=10, pady=5)
 close_button.pack(side=tk.RIGHT, padx=10)
 
 label_result = Label(root, text="", wraplength=400, bg="#f0f0f0", font=("Arial", 14))
 label_result.pack(pady=20)
+
+# Inicializando a variável de controle da captura automática
+auto_capture_id = None
 
 root.mainloop()
