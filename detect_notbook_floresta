@@ -1,0 +1,177 @@
+import torch
+import torchvision.transforms as transforms
+from PIL import Image, ImageTk
+import torchvision.models as models
+import torch.nn as nn
+import time
+import tkinter as tk
+from tkinter import Label, Button, Frame
+import socket
+import io
+import os
+from datetime import datetime
+
+# Configurações do servidor no notebook
+HOST = '0.0.0.0'  # Escuta em todas as interfaces de rede
+PORT = 8080  # Porta que o servidor vai escutar
+RASP_IP = '192.168.137.254'  # IP do Raspberry Pi no hotspot do notebook
+RASP_PORT = 3011  # Porta para enviar o comando de captura
+# Definir o modelo MobileNetV3
+loaded_model = models.mobilenet_v3_large(pretrained=False)
+num_classes = 3  # Ajuste para o número correto de classes
+
+# Modificar a primeira camada para aceitar 1 canal (escala de cinza)
+loaded_model.features[0][0] = nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1, bias=False)
+
+# Ajustar a camada de classificação final de acordo com o número de classes correto
+loaded_model.classifier[3] = nn.Linear(loaded_model.classifier[3].in_features, num_classes)
+
+# Carregar os pesos do modelo salvo
+model_state = torch.load('best_mobilenetv3_model.pth', map_location=torch.device('cpu'), weights_only=True)
+loaded_model.load_state_dict(model_state, strict=False)
+
+loaded_model = loaded_model.to(torch.device('cpu'))
+loaded_model.eval()
+
+# Transformação de imagem para escala de cinza
+transform = transforms.Compose([
+    transforms.Resize((224, 224)),  # Redimensionar para 224x224
+    transforms.Grayscale(num_output_channels=1),  # Converter para escala de cinza (1 canal)
+    transforms.ToTensor(),
+    transforms.Normalize((0.5,), (0.5,))  # Normalização para imagens em escala de cinza
+])
+
+# Criar pasta para armazenar as imagens capturadas, se ainda não existir
+save_directory = "captured_images"
+if not os.path.exists(save_directory):
+    os.makedirs(save_directory)
+
+# Função para enviar comando de captura para o Raspberry Pi
+def send_capture_command():
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((RASP_IP, RASP_PORT))
+            s.sendall(b'capture')
+            print("Comando de captura enviado para o Raspberry Pi")
+        receive_image_and_infer()
+    except Exception as e:
+        print(f"Erro ao enviar comando de captura: {e}")
+        label_result.config(text=f"Erro ao enviar comando de captura: {e}")
+
+# Função para receber a imagem do Raspberry Pi e realizar a inferência
+def receive_image_and_infer():
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(1)
+    print(f'Servidor ouvindo na porta {PORT}...')
+
+    conn, addr = server_socket.accept()
+    print(f'Imagem recebida de {addr}')
+
+    image_data = b""
+    while True:
+        data = conn.recv(1024)
+        if not data:
+            break
+        image_data += data
+
+    conn.close()
+
+    try:
+        image_stream = io.BytesIO(image_data)
+        img = Image.open(image_stream).convert('L')  # Converter para escala de cinza
+
+        # Salvar a imagem na pasta 'captured_images' com um nome único
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        image_filename = os.path.join(save_directory, f"captured_image_{timestamp}.jpg")
+        img.save(image_filename)
+        print(f"Imagem salva em: {image_filename}")
+
+        img_display = ImageTk.PhotoImage(img)
+        label_img.config(image=img_display)
+        label_img.image = img_display
+
+        image_tensor = transform(img).unsqueeze(0).to(torch.device('cpu'))
+        infer(image_tensor)
+    except Exception as e:
+        print(f"Erro ao processar a imagem: {e}")
+        label_result.config(text=f"Erro ao processar a imagem: {e}")
+
+# Função para realizar a inferência
+def infer(image_tensor):
+    try:
+        start_time = time.time()
+        with torch.no_grad():
+            output = loaded_model(image_tensor)
+            _, predicted = torch.max(output.data, 1)
+        end_time = time.time()
+
+        classes = ['Fumaça', 'Fogo', 'Nao fogo']
+        predicted_class = classes[predicted.item()]
+        inference_time = end_time - start_time
+
+        label_result.config(text=f'Classe prevista: {predicted_class}\nTempo de inferência: {inference_time:.4f} segundos')
+    except Exception as e:
+        print(f"Erro durante a inferência: {e}")
+        label_result.config(text=f"Erro durante a inferência: {e}")
+
+# Funções para enviar comandos de captura automaticamente em intervalos
+def start_automatic_capture(interval):
+    stop_automatic_capture()  # Para qualquer captura automática em andamento
+    global auto_capture_id
+    auto_capture_id = root.after(interval, lambda: [send_capture_command(), start_automatic_capture(interval)])
+
+def stop_automatic_capture():
+    global auto_capture_id
+    if auto_capture_id:
+        root.after_cancel(auto_capture_id)
+        auto_capture_id = None
+
+# Função para fechar o programa
+def close_program():
+    stop_automatic_capture()
+    root.destroy()
+
+# Interface gráfica
+root = tk.Tk()
+root.title("Inferência de Imagem com MobileNetV3")
+root.geometry("600x700")
+root.configure(bg="#f0f0f0")
+
+frame_top = Frame(root, bg="#f0f0f0")
+frame_top.place(x=10, y=10)
+
+frame_buttons = Frame(root, bg="#f0f0f0")
+frame_buttons.place(x=10, y=60)
+
+frame_img = Frame(root, bg="#f0f0f0")
+frame_img.pack(pady=100)
+
+label_img = Label(frame_img, bg="#f0f0f0")
+label_img.pack()
+
+label_ecoflight = Label(frame_top, text="EcoFlight", font=("Arial", 16, "bold"), bg="#f0f0f0")
+label_ecoflight.pack(side=tk.LEFT)
+
+label_model = Label(frame_top, text="Modelo: MobileNetV3", font=("Arial", 12), bg="#f0f0f0")
+label_model.pack(side=tk.LEFT, padx=20)
+
+# Botões para capturas automáticas em diferentes intervalos
+Button(frame_buttons, text="Captura a cada 0,5s", command=lambda: start_automatic_capture(500), bg="#007BFF", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+Button(frame_buttons, text="Captura a cada 1s", command=lambda: start_automatic_capture(1000), bg="#28a745", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+Button(frame_buttons, text="Captura a cada 0,25s", command=lambda: start_automatic_capture(250), bg="#FFC107", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.LEFT, padx=5)
+
+# Botão para parar a captura automática
+Button(frame_buttons, text="Parar Captura", command=stop_automatic_capture, bg="#FF6347", fg="white", font=("Arial", 12), padx=10, pady=5).pack(side=tk.RIGHT, padx=10)
+
+# Botão para fechar o programa
+close_button = Button(frame_buttons, text="Fechar", command=close_program, bg="#FF6347", fg="white", font=("Arial", 12), padx=10, pady=5)
+close_button.pack(side=tk.RIGHT, padx=10)
+
+label_result = Label(root, text="", wraplength=400, bg="#f0f0f0", font=("Arial", 14))
+label_result.pack(pady=20)
+
+# Inicializando a variável de controle da captura automática
+auto_capture_id = None
+
+root.mainloop()
