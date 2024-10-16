@@ -1,63 +1,110 @@
 import cv2
 import socket
+import json
+import random  # Para simular os dados de sensores (pressão, temperatura, umidade)
+import time
 
 # Configurações do servidor (Raspberry Pi)
 LISTEN_IP = '0.0.0.0'  # Escuta em todas as interfaces de rede do Raspberry Pi
 TRIGGER_PORT = 3011  # Porta que o Raspberry Pi vai escutar para o comando
 NOTEBOOK_IP = '192.168.137.1'  # IP do notebook
-NOTEBOOK_PORT = 8080  # Porta para enviar a imagem para o notebook
+NOTEBOOK_PORT = 8080  # Porta para enviar a imagem e dados para o notebook
 
 # URL do stream de vídeo do DroidCam
 CAMERA_URL = 'http://192.168.137.138:4747/video'  # URL do vídeo do DroidCam
 
-def wait_for_trigger_and_send_image():
-    # Configurar o servidor para receber o comando de captura de imagem
+# Função para simular a leitura de sensores
+def get_sensor_data():
+    # Simulação de dados dos sensores (você pode trocar por leituras reais)
+    data = {
+        'temperatura': round(random.uniform(20.0, 35.0), 2),  # Temperatura em °C
+        'pressao': round(random.uniform(990.0, 1020.0), 2),  # Pressão em hPa
+        'umidade': round(random.uniform(40.0, 90.0), 2),  # Umidade em %
+        'latitude': -23.5505,  # Simulação de latitude (você pode trocar por leitura real)
+        'longitude': -46.6333  # Simulação de longitude (você pode trocar por leitura real)
+    }
+    return data
+
+def wait_for_trigger_and_send_data():
+    # Configurar o servidor para receber o comando de captura de imagem e dados
     trigger_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     trigger_socket.bind((LISTEN_IP, TRIGGER_PORT))
     trigger_socket.listen(1)
 
-    print("Aguardando comando do notebook para tirar a foto...")
+    print("Aguardando comando do notebook para capturar e enviar dados...")
 
     while True:
         conn, addr = trigger_socket.accept()
-        print(f'Comando recebido de {addr}, capturando imagem...')
+        print(f'Comando recebido de {addr}, coletando dados...')
 
-        # Abrir a conexão com o stream de vídeo
-        cap = cv2.VideoCapture(CAMERA_URL)
+        # Receber o comando do notebook com os dados selecionados para envio
+        received_data = conn.recv(1024).decode('utf-8')
+        selection = json.loads(received_data)
+        print(f"Notebook solicitou os seguintes dados: {selection}")
 
-        if not cap.isOpened():
-            print("Erro ao acessar a câmera do celular.")
-            conn.close()
-            continue
+        # Inicializar pacote de dados
+        data_package = {'sensors': {}}
 
-        ret, frame = cap.read()
-        if not ret:
-            print("Falha ao capturar frame do vídeo.")
-            conn.close()
+        # Se o notebook solicitou imagem
+        if selection.get("image", False):
+            # Abrir a conexão com o stream de vídeo
+            cap = cv2.VideoCapture(CAMERA_URL)
+
+            if not cap.isOpened():
+                print("Erro ao acessar a câmera do celular.")
+                conn.close()
+                continue
+
+            ret, frame = cap.read()
+            if not ret:
+                print("Falha ao capturar frame do vídeo.")
+                conn.close()
+                cap.release()
+                continue
+
+            # Salvar o frame como imagem temporária
+            image_path = 'captured_image.jpg'
+            cv2.imwrite(image_path, frame)
             cap.release()
-            continue
 
-        # Salvar o frame como imagem temporária
-        image_path = 'captured_image.jpg'
-        cv2.imwrite(image_path, frame)
-        cap.release()
-
-        # Ler a imagem capturada e enviar para o notebook
-        try:
+            # Ler a imagem capturada e adicioná-la ao pacote
             with open(image_path, 'rb') as image_file:
                 image_data = image_file.read()
 
-            # Conectar ao notebook e enviar a imagem
+            data_package['image'] = image_data.hex()  # Converte a imagem para hexadecimal
+
+        # Se o notebook solicitou dados de sensores
+        if any([selection.get("temperatura"), selection.get("pressao"), selection.get("umidade"), selection.get("latitude"), selection.get("longitude")]):
+            sensor_data = get_sensor_data()
+
+            # Enviar apenas os dados solicitados pelo notebook
+            if selection.get("temperatura", False):
+                data_package['sensors']['temperatura'] = sensor_data['temperatura']
+            if selection.get("pressao", False):
+                data_package['sensors']['pressao'] = sensor_data['pressao']
+            if selection.get("umidade", False):
+                data_package['sensors']['umidade'] = sensor_data['umidade']
+            if selection.get("latitude", False):
+                data_package['sensors']['latitude'] = sensor_data['latitude']
+            if selection.get("longitude", False):
+                data_package['sensors']['longitude'] = sensor_data['longitude']
+
+        # Conectar ao notebook e enviar os dados solicitados
+        try:
             client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client_socket.connect((NOTEBOOK_IP, NOTEBOOK_PORT))
-            client_socket.sendall(image_data)
+
+            # Enviar o pacote como JSON
+            json_data = json.dumps(data_package)
+            client_socket.sendall(json_data.encode('utf-8'))
+
             client_socket.close()
-            print("Imagem enviada com sucesso!")
+            print("Dados enviados com sucesso!")
 
         except Exception as e:
-            print(f"Erro ao enviar a imagem: {e}")
+            print(f"Erro ao enviar os dados: {e}")
 
         conn.close()
 
 if __name__ == '__main__':
-    wait_for_trigger_and_send_image()
+    wait_for_trigger_and_send_data()
