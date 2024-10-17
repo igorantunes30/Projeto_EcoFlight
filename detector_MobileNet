@@ -45,14 +45,14 @@ def check_connection():
             connected = True
             return True
     except Exception as e:
-        print(f"Falha na conexão com o Raspberry Pi: {e}")
+        print(f"Falha Na Conexão: {e}")
         connected = False
         return False
 
 # Função para carregar o modelo com as configurações fornecidas
 def load_model():
     global loaded_model
-    print(f"Modelo {model_path} carregado com sucesso!")
+    print(f"Modelo {model_path} Carregado Com Sucesso!")
 
 # Função para buscar o caminho do modelo treinado
 def browse_model():
@@ -99,9 +99,9 @@ def send_command_to_rasp():
         client_socket.sendall(json_data.encode('utf-8'))
 
         client_socket.close()
-        print("Comando enviado com sucesso!")
+        print("Comando Enviado")
     except Exception as e:
-        print(f"Erro ao enviar o comando: {e}")
+        print(f"Comando Não Enviado: {e}")
 
 # Função para capturar informações do Raspberry Pi
 def capture_information():
@@ -236,19 +236,19 @@ label_img = Label(frame_monitoring, bg="#333333")
 label_img.pack(fill="both", expand=True, padx=20, pady=20)
 
 # Botões da segunda interface
-button_capture_once = Button(frame_monitoring, text="Capturar Informação", command=capture_information, bg="#007BFF", fg="white")
+button_capture_once = Button(frame_monitoring, text="CAPTURAR", command=capture_information, bg="#007BFF", fg="white")
 button_capture_once.pack(pady=10)
 
-button_auto_capture = Button(frame_monitoring, text="Capturar Informação a cada 1 segundo", command=start_auto_capture, bg="#28a745", fg="white")
+button_auto_capture = Button(frame_monitoring, text="CAPTURAR SEQUENCIALMENTE", command=start_auto_capture, bg="#28a745", fg="white")
 button_auto_capture.pack(pady=10)
 
-button_stop_capture = Button(frame_monitoring, text="Parar Captura Automática", command=stop_auto_capture, bg="#FF6347", fg="white")
+button_stop_capture = Button(frame_monitoring, text="PARAR CAPTURA", command=stop_auto_capture, bg="#FF6347", fg="white")
 button_stop_capture.pack(pady=10)
 
-button_back_to_config = Button(frame_monitoring, text="Voltar para Interface de Conexão", command=switch_to_connection_interface, bg="#FF6347", fg="white")
+button_back_to_config = Button(frame_monitoring, text="VOLTAR", command=switch_to_connection_interface, bg="#FF6347", fg="white")
 button_back_to_config.pack(pady=10)
 
-button_close_monitoring = Button(frame_monitoring, text="Fechar Programa", command=close_program, bg="#FF6347", fg="white")
+button_close_monitoring = Button(frame_monitoring, text="FECHAR", command=close_program, bg="#FF6347", fg="white")
 button_close_monitoring.pack(pady=10)
 
 # Inicializando o loop da interface
