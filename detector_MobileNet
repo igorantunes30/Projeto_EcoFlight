@@ -1,0 +1,255 @@
+import tkinter as tk
+from tkinter import Label, Button, Frame, Entry, filedialog, Checkbutton, BooleanVar
+from PIL import Image, ImageTk
+import socket
+import json
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import threading
+import time
+
+# Inicializando a janela principal (root)
+root = tk.Tk()
+root.title("MobileNetV3")
+root.geometry("1200x700")
+root.configure(bg="#f0f0f0")
+
+# Variáveis globais
+host = ''
+port = 0
+rasp_ip = ''
+rasp_port = 0
+num_classes = 3
+model_path = 'best_mobilenetv3_model.pth'
+loaded_model = None
+class_names = []
+connected = False
+auto_capture_id = None  # Identificador para captura automática a cada 1 segundo
+
+# Variáveis para o monitoramento de dados
+send_image = BooleanVar()
+send_pressure = BooleanVar()
+send_temperature = BooleanVar()
+send_humidity = BooleanVar()
+
+# Função para fechar o programa
+def close_program():
+    root.quit()
+
+# Função para verificar a conexão com o Raspberry Pi
+def check_connection():
+    global connected
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((rasp_ip, rasp_port))
+            connected = True
+            return True
+    except Exception as e:
+        print(f"Falha na conexão com o Raspberry Pi: {e}")
+        connected = False
+        return False
+
+# Função para carregar o modelo com as configurações fornecidas
+def load_model():
+    global loaded_model
+    print(f"Modelo {model_path} carregado com sucesso!")
+
+# Função para buscar o caminho do modelo treinado
+def browse_model():
+    global model_path
+    model_path = filedialog.askopenfilename(filetypes=[("Model files", "*.pth")])
+    entry_model_path.delete(0, tk.END)
+    entry_model_path.insert(0, model_path)
+
+# Função para aplicar as configurações
+def apply_settings():
+    global host, port, rasp_ip, rasp_port, num_classes, model_path, class_names
+    host = entry_host.get()
+    port = int(entry_port.get())
+    rasp_ip = entry_rasp_ip.get()
+    rasp_port = int(entry_rasp_port.get())
+    num_classes = int(entry_num_classes.get())
+    model_path = entry_model_path.get()
+    class_names = entry_class_names.get().split(",")
+    load_model()
+
+    if check_connection():
+        label_result.config(text="Configurações aplicadas, modelo carregado e Raspberry conectado!")
+        switch_to_monitoring_interface()
+    else:
+        label_result.config(text="Configurações aplicadas, modelo carregado, mas falha na conexão com o Raspberry.")
+
+# Função para enviar o comando JSON para o Raspberry Pi
+def send_command_to_rasp():
+    selection = {
+        "image": send_image.get(),
+        "temperatura": send_temperature.get(),
+        "pressao": send_pressure.get(),
+        "umidade": send_humidity.get(),
+        "latitude": False,  # Caso você queira incluir no futuro
+        "longitude": False  # Caso você queira incluir no futuro
+    }
+
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((rasp_ip, rasp_port))
+
+        # Enviar o comando JSON para o Raspberry Pi
+        json_data = json.dumps(selection)
+        client_socket.sendall(json_data.encode('utf-8'))
+
+        client_socket.close()
+        print("Comando enviado com sucesso!")
+    except Exception as e:
+        print(f"Erro ao enviar o comando: {e}")
+
+# Função para capturar informações do Raspberry Pi
+def capture_information():
+    # Enviar comando para o Raspberry Pi
+    send_command_to_rasp()
+
+    # Aguardar dados do Raspberry Pi (você pode adicionar a lógica de recepção aqui)
+    receive_image_and_infer()
+
+# Função para iniciar a captura automática a cada 1 segundo
+def start_auto_capture():
+    capture_information()
+    global auto_capture_id
+    auto_capture_id = root.after(1000, start_auto_capture)
+
+# Função para parar a captura automática
+def stop_auto_capture():
+    global auto_capture_id
+    if auto_capture_id:
+        root.after_cancel(auto_capture_id)
+        auto_capture_id = None
+
+# Função para receber a imagem e realizar inferência (simulação)
+def receive_image_and_infer():
+    img = Image.open("ecoflight.jpg.webp")
+    img = img.resize((300, 300))
+    img_display = ImageTk.PhotoImage(img)
+
+    # Atualizar a imagem na interface
+    label_img.config(image=img_display)
+    label_img.image = img_display
+
+# Função para trocar para a interface de monitoramento
+def switch_to_monitoring_interface():
+    frame_config.pack_forget()  # Esconde a primeira interface
+    frame_monitoring.pack(fill="both", expand=True)  # Mostra a segunda interface
+
+# Função para voltar à interface de conexão
+def switch_to_connection_interface():
+    frame_monitoring.pack_forget()  # Esconde a segunda interface
+    frame_config.pack(fill="both", expand=True)  # Mostra a primeira interface
+
+# Interface de configuração (primeira interface)
+frame_config = Frame(root, bg="#f0f0f0")
+frame_config.pack(fill="both", expand=True)
+
+label_config = Label(frame_config, text="Detector Object", font=("Arial", 14, "bold"), bg="#f0f0f0")
+label_config.pack(pady=10)
+
+# Símbolo e nome da empresa
+company_logo = Image.open('ecoflight.jpg.webp')
+company_logo = company_logo.resize((100, 100))
+company_logo_img = ImageTk.PhotoImage(company_logo)
+label_logo = Label(frame_config, image=company_logo_img, bg="#f0f0f0")
+label_logo.pack(pady=5)
+
+label_company_name = Label(frame_config, text="EcoFlight", font=("Arial", 20, "bold"), bg="#f0f0f0")
+label_company_name.pack(pady=5)
+
+# Entradas para HOST, PORT, RASP_IP e RASP_PORT
+label_host = Label(frame_config, text="HOST:", bg="#f0f0f0")
+label_host.pack(anchor="w", padx=20)
+entry_host = Entry(frame_config, width=30)
+entry_host.pack(pady=5, padx=20)
+
+label_port = Label(frame_config, text="PORT:", bg="#f0f0f0")
+label_port.pack(anchor="w", padx=20)
+entry_port = Entry(frame_config, width=30)
+entry_port.pack(pady=5, padx=20)
+
+label_rasp_ip = Label(frame_config, text="RASP_IP:", bg="#f0f0f0")
+label_rasp_ip.pack(anchor="w", padx=20)
+entry_rasp_ip = Entry(frame_config, width=30)
+entry_rasp_ip.pack(pady=5, padx=20)
+
+label_rasp_port = Label(frame_config, text="RASP_PORT:", bg="#f0f0f0")
+label_rasp_port.pack(anchor="w", padx=20)
+entry_rasp_port = Entry(frame_config, width=30)
+entry_rasp_port.pack(pady=5, padx=20)
+
+# Configurações do modelo
+label_num_classes = Label(frame_config, text="Número de Classes:", bg="#f0f0f0")
+label_num_classes.pack(anchor="w", padx=20)
+entry_num_classes = Entry(frame_config, width=30)
+entry_num_classes.pack(pady=5, padx=20)
+
+label_class_names = Label(frame_config, text="Nomes das Classes (separados por vírgula):", bg="#f0f0f0")
+label_class_names.pack(anchor="w", padx=20)
+entry_class_names = Entry(frame_config, width=30)
+entry_class_names.pack(pady=5, padx=20)
+
+label_model_path = Label(frame_config, text="Modelo Treinado (path):", bg="#f0f0f0")
+label_model_path.pack(anchor="w", padx=20)
+entry_model_path = Entry(frame_config, width=30)
+entry_model_path.pack(pady=5, padx=20)
+
+# Botão para buscar o arquivo do modelo
+button_browse = Button(frame_config, text="Procurar Modelo", command=browse_model, bg="#6c757d", fg="white")
+button_browse.pack(pady=5)
+
+# Caixas de seleção para os dados a serem transmitidos
+checkbox_image = Checkbutton(frame_config, text="Imagem", variable=send_image, bg="#f0f0f0")
+checkbox_image.pack(anchor="w", padx=20)
+checkbox_pressure = Checkbutton(frame_config, text="Pressão", variable=send_pressure, bg="#f0f0f0")
+checkbox_pressure.pack(anchor="w", padx=20)
+checkbox_temperature = Checkbutton(frame_config, text="Temperatura", variable=send_temperature, bg="#f0f0f0")
+checkbox_temperature.pack(anchor="w", padx=20)
+checkbox_humidity = Checkbutton(frame_config, text="Umidade", variable=send_humidity, bg="#f0f0f0")
+checkbox_humidity.pack(anchor="w", padx=20)
+
+# Botão para aplicar configurações
+button_apply = Button(frame_config, text="Aplicar Configurações", command=apply_settings, bg="#28a745", fg="white")
+button_apply.pack(pady=20)
+
+# Botão para fechar o programa
+button_close = Button(frame_config, text="Fechar Programa", command=close_program, bg="#FF6347", fg="white")
+button_close.pack(pady=10)
+
+# Resultados
+label_result = Label(frame_config, text="", bg="#f0f0f0", font=("Arial", 12))
+label_result.pack(pady=20)
+
+# Interface de monitoramento (segunda interface)
+frame_monitoring = Frame(root, bg="#f0f0f0")
+
+# Gráficos e dados recebidos
+frame_graph = Frame(frame_monitoring, bg="#f0f0f0", width=400, height=300)
+frame_graph.pack(pady=20, side="left")
+
+# Parte direita da interface de monitoramento (imagem recebida)
+label_img = Label(frame_monitoring, bg="#333333")
+label_img.pack(fill="both", expand=True, padx=20, pady=20)
+
+# Botões da segunda interface
+button_capture_once = Button(frame_monitoring, text="Capturar Informação", command=capture_information, bg="#007BFF", fg="white")
+button_capture_once.pack(pady=10)
+
+button_auto_capture = Button(frame_monitoring, text="Capturar Informação a cada 1 segundo", command=start_auto_capture, bg="#28a745", fg="white")
+button_auto_capture.pack(pady=10)
+
+button_stop_capture = Button(frame_monitoring, text="Parar Captura Automática", command=stop_auto_capture, bg="#FF6347", fg="white")
+button_stop_capture.pack(pady=10)
+
+button_back_to_config = Button(frame_monitoring, text="Voltar para Interface de Conexão", command=switch_to_connection_interface, bg="#FF6347", fg="white")
+button_back_to_config.pack(pady=10)
+
+button_close_monitoring = Button(frame_monitoring, text="Fechar Programa", command=close_program, bg="#FF6347", fg="white")
+button_close_monitoring.pack(pady=10)
+
+# Inicializando o loop da interface
+root.mainloop()
