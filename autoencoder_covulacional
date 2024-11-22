@@ -1,0 +1,70 @@
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras import layers, models
+from sklearn.model_selection import train_test_split
+from skimage.metrics import peak_signal_noise_ratio as psnr
+from skimage.metrics import structural_similarity as ssim
+import matplotlib.pyplot as plt
+
+# 1. Carregar dados (exemplo usando MNIST, mas pode usar outro dataset)
+(x_train, _), (x_test, _) = tf.keras.datasets.mnist.load_data()  # Usando MNIST para teste
+x_train = x_train / 255.0  # Normalizar valores entre 0 e 1
+x_test = x_test / 255.0
+
+# Expandir dimensões para imagens em escala de cinza (1 canal)
+x_train = np.expand_dims(x_train, axis=-1)
+x_test = np.expand_dims(x_test, axis=-1)
+
+# Separar dados para validação
+x_train, x_val = train_test_split(x_train, test_size=0.1, random_state=42)
+
+# 2. Criar modelo de autoencoder
+latent_dim = 16  # Tamanho do espaço latente (ajustável)
+
+# Encoder
+encoder_input = layers.Input(shape=(28, 28, 1))  # Dimensão de entrada
+x = layers.Conv2D(32, (3, 3), activation='relu', padding='same')(encoder_input)
+x = layers.MaxPooling2D((2, 2), padding='same')(x)
+x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+x = layers.MaxPooling2D((2, 2), padding='same')(x)
+latent_space = layers.Conv2D(latent_dim, (3, 3), activation='relu', padding='same')(x)
+
+# Decoder
+x = layers.Conv2DTranspose(64, (3, 3), activation='relu', padding='same')(latent_space)
+x = layers.UpSampling2D((2, 2))(x)
+x = layers.Conv2DTranspose(32, (3, 3), activation='relu', padding='same')(x)
+x = layers.UpSampling2D((2, 2))(x)
+decoder_output = layers.Conv2D(1, (3, 3), activation='sigmoid', padding='same')(x)
+
+autoencoder = models.Model(encoder_input, decoder_output)
+
+# 3. Compilar e treinar o modelo
+autoencoder.compile(optimizer='adam', loss='binary_crossentropy')
+autoencoder.fit(x_train, x_train, epochs=10, batch_size=128, validation_data=(x_val, x_val))
+
+# 4. Testar compressão e reconstrução
+encoded_imgs = models.Model(encoder_input, latent_space).predict(x_test)  # Compressão
+decoded_imgs = autoencoder.predict(x_test)  # Reconstrução
+
+# 5. Avaliar perda de qualidade
+psnr_scores = [psnr(x_test[i], decoded_imgs[i]) for i in range(len(x_test))]
+ssim_scores = [ssim(x_test[i].squeeze(), decoded_imgs[i].squeeze()) for i in range(len(x_test))]
+
+print(f"Média PSNR: {np.mean(psnr_scores):.2f} dB")
+print(f"Média SSIM: {np.mean(ssim_scores):.2f}")
+
+# 6. Visualizar resultados
+n = 5  # Número de exemplos para exibir
+plt.figure(figsize=(10, 4))
+for i in range(n):
+    # Imagem original
+    plt.subplot(2, n, i + 1)
+    plt.imshow(x_test[i].squeeze(), cmap='gray')
+    plt.title("Original")
+    plt.axis("off")
+    # Imagem reconstruída
+    plt.subplot(2, n, i + n + 1)
+    plt.imshow(decoded_imgs[i].squeeze(), cmap='gray')
+    plt.title("Reconstruída")
+    plt.axis("off")
+plt.show()
