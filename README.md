@@ -68,6 +68,35 @@ Passo 5: Exibir a Imagem no Notebook
 No notebook, você pode criar uma interface simples em Python para se comunicar com o ESP32 B e exibir a imagem recebida.
 
 Código Python no Notebook:
+2. Ajustando Parâmetros
+
+Você pode ajustar os seguintes parâmetros para avaliar como a compressão afeta a qualidade:
+
+    Tamanho do espaço latente (latent_dim):
+        Menor valor: Maior compactação, mas mais perda de dados.
+        Maior valor: Menor compactação, mas melhor qualidade.
+
+    Arquitetura do Encoder/Decoder:
+        Camadas adicionais de convolução ou pooling aumentam a abstração.
+        Camadas mais profundas podem melhorar a qualidade, mas podem introduzir ruídos.
+
+    Função de perda:
+        binary_crossentropy é adequada para imagens normalizadas (0-1).
+        mean_squared_error pode ser usada para reconstruções mais precisas.
+
+    Número de épocas:
+        Mais épocas ajudam o modelo a aprender padrões melhores, mas podem levar a overfitting.
+
+3. Métricas de Avaliação
+
+    PSNR: Avalia a relação entre o sinal original e o ruído introduzido pela compressão. Valores acima de 30 dB indicam boa qualidade.
+    SSIM: Mede a similaridade estrutural entre a imagem original e a reconstruída. Valores próximos de 1 indicam alta qualidade.
+
+Como usar o script
+
+    Execute o script em Python (requer TensorFlow, NumPy, scikit-image e Matplotlib).
+    Ajuste latent_dim e observe como a compactação afeta as métricas PSNR e SSIM.
+    Experimente diferentes datasets ou formatos de entrada (imagens RGB, por ex
 -----------------------------------------------------------------------------------------------------------
 Passo 6: Testar o Sistema
 Inicie o código no ESP32 A e no Raspberry Pi.
